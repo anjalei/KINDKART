@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Donation = require('../model/Donation'); 
 const Charity = require('../model/Charity');
 
+
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
@@ -18,6 +19,10 @@ exports.createOrder = async (req, res) => {
             amount: amount * 100,
             currency: "INR",
             receipt: `receipt_${Date.now()}`,
+            notes: {
+    userId: req.user.id,
+    charityId
+  }
         };
 
         const order = await razorpay.orders.create(options);
@@ -58,4 +63,64 @@ exports.verifyPayment = async (req, res) => {
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
+};
+exports.history = async (req,res)=>{
+    try{
+      const donationHistory= await Donation.findAll({where:{userId:req.user.id},
+      attributes: ['amount', 'createdAt'], 
+      include: [
+        {
+          model: Charity,
+          attributes: ['name'] 
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+      if(!donationHistory|| donationHistory.length === 0){
+        return res.status(404).json({message:"No Donation History For This User"})
+      }
+      return res.status(200).json(donationHistory)
+    }catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+}
+
+
+
+exports.handleWebhook = async (req, res) => {
+  try {
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET; 
+    const shasum = crypto.createHmac('sha256', secret)
+                         .update(JSON.stringify(req.body))
+                         .digest('hex');
+
+    if (shasum !== req.headers['x-razorpay-signature']) {
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    const event = req.body.event;
+
+    if (event === 'payment.captured') {
+      const payment = req.body.payload.payment.entity;
+
+      const donation = await Donation.create({
+        amount: payment.amount / 100, 
+        userId: payment.notes.userId, 
+        charityId: payment.notes.charityId, 
+        paymentId: payment.id,
+        status: 'SUCCESS'
+      });
+
+      
+      const charity = await Charity.findByPk(payment.notes.charityId);
+      if (charity) {
+        charity.goal += payment.amount / 100;
+        await charity.save();
+      }
+    }
+
+    res.status(200).json({ status: 'ok' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };

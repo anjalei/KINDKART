@@ -1,5 +1,6 @@
 const Charity = require('../model/Charity')
-
+const Donation = require('../model/Donation')
+const User = require('../model/User')
 exports.fetch=async(req,res)=>{
     try{
        const charities= await Charity.findAll();
@@ -27,3 +28,42 @@ exports.add=async(req,res)=>{
         return res.status(500).json({error:err.message})
     }
 }
+exports.charityDashboard = async (req, res) => {
+  try {
+    const donations = await Donation.findAll({
+      where: { charityId: req.user.id },
+      include: [{ model: User, attributes: ['name', 'email'] }]
+    });
+    res.status(200).json(donations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getCharityById = async (req, res) => {
+  try {
+    const charity = await Charity.findByPk(req.params.id, {
+      attributes: ['id', 'name', 'description', 'goal', 'photo'],
+      include: [{
+        model: Donation,
+        attributes: ['amount']
+      }]
+    });
+
+    if (!charity) return res.status(404).json({ error: 'Charity not found' });
+
+    // Calculate total donations
+    const totalDonations = charity.Donations.reduce((sum, d) => sum + d.amount, 0);
+
+    res.status(200).json({
+      id: charity.id,
+      name: charity.name,
+      description: charity.description,
+      goal: charity.goal,
+      photo: charity.photo,
+      totalDonations
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

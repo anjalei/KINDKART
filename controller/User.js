@@ -1,6 +1,7 @@
 const User=require('../model/User')
 const bcrypt=require('bcrypt')
-const jwt=require('jsonwebtoken')
+const jwt=require('jsonwebtoken');
+
 
 exports.signUp= async (req,res)=>{
     try{
@@ -42,11 +43,21 @@ exports.login= async(req,res)=>{
      id:user.id,
      email:user.email,
      role:user.role
-      },process.env.JWT_SECRET,{expiresIn:'2h'});
+      },process.env.JWT_SECRET,{expiresIn:'7d'});
       return res.status(200).json({message:'User login successful',
         token,
         user:{id:user.id,email:user.email,role:user.role}})
     }catch (err) {
     res.status(500).json({ message: "Server error" });
+    }
+}
+exports.profile = async (req,res)=>{
+    try{
+     const user = await User.findByPk(req.user.id);
+     if (!user) return res.status(404).json({ error: "User not found" });
+     const { name, email, role } = user.get();
+     return res.status(200).json({name,email,role})
+    }catch(err){
+        return res.status(500).json({error:err.message})
     }
 }

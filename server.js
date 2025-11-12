@@ -14,10 +14,10 @@ const Charity=require('./model/Charity')
 const Donation =require('./model/Donation')
 const UserRoutes=require('./routes/user')
 const charityRoutes=require('./routes/charity')
-const donationRoutes = require('./routes/donation');
-app.use('/donation', donationRoutes);
+const donationRoutes=require('./routes/donation')
 app.use('/user',UserRoutes);
 app.use('/charity',charityRoutes);
+app.use('/donation',donationRoutes);
 
  User.hasMany(Charity);
 Charity.belongsTo(User);
@@ -25,10 +25,11 @@ Charity.belongsTo(User);
 User.hasMany(Donation);
 Donation.belongsTo(User);
 
-
+Charity.hasMany(Donation);
+Donation.belongsTo(Charity);
 
 const port=3000;
-sequelize.sync()
+sequelize.sync({ alter: true })
 .then(()=>{
     app.listen(port,()=>{
         console.log("server running and sequelize connected!")
